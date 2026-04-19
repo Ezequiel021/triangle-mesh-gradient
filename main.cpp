@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <bitset>
 #include <mpi.h>
+#include <chrono>
 
 // bit interleaving unordered pair hashing
 inline int64_t hash(int32_t a, int32_t b)
@@ -46,23 +47,19 @@ struct edge
 
 int load_vtk(std::vector<float2> &vertices, std::vector<polygon> &faces)
 {
-    std::ifstream vtk("../mesh.vtk");
+    std::ifstream vtk("../mallaraya.vtk");
     if (!vtk.is_open())
     {
+        std::cerr << "Error: No se pudo abrir ../mesh.vtk\n";
         return -1;
     }
 
     std::string buffer, discard;
 
-    // Skip "ASCII" line
-    std::getline(vtk, discard);
-    
-    // Skip "DATASET ... " line
-    std::getline(vtk, discard);
+    // Skip headers til keyword "POINTS"
+    while (vtk >> buffer && buffer != "POINTS");
 
     int vertex_count;
-    // Read "POINTS ... " line
-    vtk >> discard;
     vtk >> vertex_count;
     vtk >> discard;
 
@@ -74,52 +71,55 @@ int load_vtk(std::vector<float2> &vertices, std::vector<polygon> &faces)
         vtk >> discard;
     }
 
-    // Skip "CELLS" line
-    std::getline(vtk, discard);
+    // Skip til kw "CELLS"
+    while (vtk >> buffer && buffer != "CELLS"){}
 
-    std::string sbuf;
-    while (std::getline(vtk, sbuf))
+    int cell_count, cell_list_size;
+    vtk >> cell_count >> cell_list_size;
+
+    faces.reserve(cell_count);
+    for (int c = 0; c < cell_count; c++)
     {
-        std::stringstream ss(sbuf);
-
         polygon poly_buffer;
-        ss >> poly_buffer.vertex_count;
-        poly_buffer.vertex_id.resize(vertex_count);
-        
-        for (int i : poly_buffer.vertex_id)
+        vtk >> poly_buffer.vertex_count;
+        poly_buffer.vertex_id.resize(poly_buffer.vertex_count);
+
+        for (int i = 0; i < poly_buffer.vertex_count; i++)
         {
-            ss >> i;
+            vtk >> poly_buffer.vertex_id[i];
         }
 
         faces.push_back(poly_buffer);
     }
 
-    std::cout << "archivo .vtk cargado con exito" << "\n";
+    std::cout << "Archivo .vtk cargado con exito. Vertices: "
+              << vertex_count << ", Caras: " << cell_count << "\n";
     return 0;
 }
-
 void find_neighbor_poly(std::vector<polygon> &faces)
 {
     std::unordered_map<int64_t, int32_t> mp;
     int face_count = faces.size();
     for (int f = 0; f < face_count; f++)
     {
-        for (int i = 0; i < faces[f].vertex_count; i++)
+        int v_count = faces[f].vertex_id.size();
+        for (int i = 0; i < v_count; i++)
         {
-            for (int j = i + 1; j < faces[f].vertex_count; j++)
+            int32_t v1 = faces[f].vertex_id[i];
+            int32_t v2 = faces[f].vertex_id[(i + 1) % v_count];
+
+            int64_t key = hash(v1, v2);
+            
+            auto nf = mp.find(key);
+            if (nf != mp.end())
             {
-                int64_t key = hash(faces[f].vertex_id[i], faces[f].vertex_id[j]);
-                auto nf = mp.find(key);
-                if (nf != mp.end())
-                {
-                    faces[f].neighboor_id.emplace_back(nf->second);
-                    faces[nf->second].neighboor_id.push_back(f); // Ensure symmetry
-                    mp.erase(nf);
-                }
-                else
-                {
-                    mp.insert({key, f});
-                }
+                faces[f].neighboor_id.emplace_back(nf->second);
+                faces[nf->second].neighboor_id.push_back(f); // Ensure symmetry
+                mp.erase(nf);
+            }
+            else
+            {
+                mp.insert({key, f});
             }
         }
     }
@@ -132,14 +132,10 @@ int main()
 
     load_vtk(vertices, faces);
 
+    auto start = std::chrono::high_resolution_clock::now();
     find_neighbor_poly(faces);
-    for (int i = 0; i < faces.size(); i++)
-    {
-        std::cout << i << ": ";
-        for (int j = 0; j < faces[i].neighboor_id.size(); j++)
-        {
-            std::cout << faces[i].neighboor_id[j] << ", ";
-        }
-        std::cout << "\n";
-    }
+    auto end = std::chrono::high_resolution_clock::now();
+
+    auto runtime_neighbors = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    std::cout << "Tiempo en calcular los polígonos vecinos: " << runtime_neighbors.count() << "\n";
 }
