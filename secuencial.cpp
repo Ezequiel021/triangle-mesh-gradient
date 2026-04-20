@@ -53,7 +53,7 @@ struct edge
 ///Funcion auxiliar calcula el centroide dado una cara
 float2 centroid(const polygon& p, const std::vector<float2>& vertices)
 {
-    double x = 0.0f, y = 0.0f;
+    double x = 0.0, y = 0.0;
     for (int v : p.vertex_id){
         x += vertices[v].x;
         y += vertices[v].y;
@@ -65,57 +65,53 @@ double funct(double x,double y){
     return 20.0*(std::sin(4*x)*std::sin(3*y)+0.3*std::cos(6*x)*std::sin(5*y)+1);
 }
 
-int load_vtk(const std::string namefile, std::vector<float2> &vertices, std::vector<polygon> &faces)
+int load_vtk(const std::string namefile,std::vector<float2> &vertices, std::vector<polygon> &faces)
 {
-    std::ifstream vtk("../mallaraya.vtk");
+    std::ifstream vtk(namefile);
     if (!vtk.is_open())
     {
-        std::cerr << "Error: No se pudo abrir ../mesh.vtk\n";
         return -1;
     }
 
-    std::string buffer, discard;
+    std::string buffer;
+    ///Skipeamos header
+    std::getline(vtk,buffer);
+    std::getline(vtk,buffer);
+    std::getline(vtk,buffer);
+    std::getline(vtk,buffer);
+    int vertex_c;
+    //input es de la forma  points <vertex_c> <type>
+    vtk >> buffer >> vertex_c >> buffer;
 
-    // Skip headers til keyword "POINTS"
-    while (vtk >> buffer && buffer != "POINTS");
+    vertices.resize(vertex_c);
 
-    int vertex_count;
-    vtk >> vertex_count;
-    vtk >> discard;
-
-    vertices.resize(vertex_count);
-    for (int i = 0; i < vertex_count; i++)
-    {
-        vtk >> vertices[i].x;
-        vtk >> vertices[i].y;
-        vtk >> discard;
+    ///Leemos vertices
+    for(int i = 0; i < vertex_c;i++){
+        double x,y,z;
+        vtk >> x >> y >> z;
+        vertices[i].set(x,y);
     }
 
-    // Skip til kw "CELLS"
-    while (vtk >> buffer && buffer != "CELLS"){}
+    ///Leemos las celdas (caras)
+    int num_cells,total_size;
+    vtk >> buffer >> num_cells >> total_size;
+    faces.clear();
+    faces.reserve(num_cells);
 
-    int cell_count, cell_list_size;
-    vtk >> cell_count >> cell_list_size;
-
-    faces.reserve(cell_count);
-    for (int c = 0; c < cell_count; c++)
-    {
-        polygon poly_buffer;
-        vtk >> poly_buffer.vertex_count;
-        poly_buffer.vertex_id.resize(poly_buffer.vertex_count);
-
-        for (int i = 0; i < poly_buffer.vertex_count; i++)
-        {
-            vtk >> poly_buffer.vertex_id[i];
+    for(int i = 0; i < num_cells;i++){
+        polygon poly;
+        vtk >> poly.vertex_count;
+        poly.vertex_id.resize(poly.vertex_count);
+        for(int j = 0; j < poly.vertex_count;j++){
+            vtk >> poly.vertex_id[j];
         }
-
-        faces.push_back(poly_buffer);
+        if(poly.vertex_count == 3)//Ignoramos las aristas, solo triangulos
+            faces.push_back(poly);
     }
-
-    std::cout << "Archivo .vtk cargado con exito. Vertices: "
-              << vertex_count << ", Caras: " << cell_count << "\n";
+    std::cout << "Loaded VTK: " << vertex_c << " vertices, " << num_cells << " cells\n";
     return 0;
 }
+
 void find_neighbor_poly(std::vector<polygon> &faces)
 {
     std::unordered_map<int64_t, int32_t> mp;
