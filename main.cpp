@@ -23,7 +23,6 @@ struct vec2
     // Inicializar obligatoriamente en 0
     vec2() : x(0.0), y(0.0) {}
     vec2(double x, double y) : x(x), y(y) {}
-    // ...
 };
 
 struct polygon
@@ -47,6 +46,7 @@ vec2 grad_analytical(double x, double y)
     return vec2(df_dx, df_dy);
 }
 
+    // ...
 int load_vtk(const std::string &filename, std::vector<vec2> &vertices, std::vector<polygon> &faces)
 {
     std::ifstream vtk(filename);
@@ -183,7 +183,7 @@ int main(int argc, char **argv)
     std::vector<polygon> faces;
 
     // Todos leen la malla para tener acceso implícito a "ghost nodes"
-    if (load_vtk("../mallaraya.vtk", vertices, faces) != 0)
+    if (load_vtk(argv[1], vertices, faces) != 0)
     {
         if (rank == 0)
             std::cerr << "Error cargando la malla.\n";
