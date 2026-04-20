@@ -2,6 +2,10 @@
 
 https://github.com/Ezequiel021/triangle-mesh-gradient
 
+# Dependencies
+
+OpenMPI y CMake
+
 # Build
 
 ```
