@@ -16,12 +16,12 @@ cmake build .
 
 # Run
 ```
-./gradiente filename.vtk
+mpirun -np number-of-process ./gradiente filename.vtk
 ```
 
 Reemplaze filename.vtk con el archivo vtk que quiera procesar. El repositorio incluye la malla de mantarraya y una malla de ejemplo:
 
 # Example
 ```
-./gradiente ../mallaraya.vtk
+mpirun -np 4 ./gradiente ../mallaraya.vtk
 ```
